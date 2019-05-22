@@ -1,6 +1,6 @@
 # GyroMaze
 <p align="center">
-  <img src="https://github.com/marcel1hruska/GyroMaze/blob/master/screenshots/maze.jpg" width="350" title="Hard Difficulty Maze">
+  <img src="https://github.com/marcel1hruska/GyroMaze/blob/master/screenshots/maze.jpg" title="Hard Difficulty Maze">
 </p>
 Select difficulty and start the game! Each time you get a new randomly generated maze. Collect the coins while avoiding the holes.
 
