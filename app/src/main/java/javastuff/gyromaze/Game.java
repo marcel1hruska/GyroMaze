@@ -24,8 +24,8 @@ import android.view.WindowManager;
 import android.widget.FrameLayout;
 
 /** 
- * Main Game Activity
- * Holds Engine and necessary managers
+ * Main game activity.
+ * Holds Engine and necessary managers.
  */
 public class Game extends AppCompatActivity {
     enum Side {top, bottom, right, left}
@@ -95,8 +95,8 @@ public class Game extends AppCompatActivity {
     }
 
     /**
-     * Activity resumed
-     * Keep paused on outside resume (display wake up)
+     * Activity resumed.
+     * Keep paused on outside resume (display wake up).
      */
     @Override
     protected void onResume() {
@@ -134,6 +134,7 @@ public class Game extends AppCompatActivity {
     {
         if (highscore < engine.score)
         {
+            // save new highscore
             SharedPreferences.Editor editor = getSharedPreferences("score_value_unique_key", Context.MODE_PRIVATE).edit();
             editor.putInt("score", engine.score);
             editor.commit();
@@ -152,48 +153,78 @@ public class Game extends AppCompatActivity {
                         | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
     }
 
+    /**
+     * Game engine.
+     * Captures sensor's values, on each frame updates ball's position and resolves collisions with coins, holes, walls and boundaries.
+     */
     class Engine extends FrameLayout implements SensorEventListener {
-        // number of cells
-        private final int cellsX;
-        private  final int cellsY;
-        // game state
+        /**
+         * Number of cells
+         */
+        private final int cellsX, cellsY;
+        /**
+         * Game state
+         */
         public boolean Paused = false;
-        // acceleration sensor
+        /**
+         * Acceleration sensor
+         */
         private final Sensor accel;
-        // captured sensors values
+        /**
+         * Captured acceleration values
+         */
         private Vector sensor;
-        // screen resolution
-        private float screenWidth;
-        private float screenHeight;
-        // ball in maze
+        /**
+         * Screen resolution
+         */
+        private float screenWidth,screenHeight;
+        /**
+         * THE ball
+         */
         private Ball ball;
-        // random maze generator
+        /**
+         * Random maze generator
+         */
         private MazeGenerator gen;
-        // existing walls
-        private Wall verticalWalls[][];
-        private Wall horizontalWalls[][];
-        // game info deduced from current resolution
-        private final int horizontalWallHWidth;
-        private final int verticalWallHeight;
-        private final int wallSize;
-        private final int cellSize;
+        /**
+         * Existing walls
+         */
+        private Wall verticalWalls[][], horizontalWalls[][];
+        /**
+         * Game info deduced from current resolution
+         */
+        private final int horizontalWallHWidth,verticalWallHeight,wallSize,cellSize;
         private final float circleDiameter;
-        // collectible coins
+        /**
+         * Collectible coins
+         */
         private Coin coins[][];
-        // holes, game over if hit
+        /**
+         * Holes, game's over if hit
+         */
         private Hole holes[][];
-        // previous time
+        /**
+         * Last step time
+         */
         private long lastTime = 0;
-        // current score
+        /**
+         * Current score
+         */
         int score = 0;
-        // number of coins left
+        /**
+         * Number of coins left
+         */
         int coinCount = 0;
-        // difficulty multipliers
-        float holeSize;
-        float holeChance;
+        /**
+         * Difficulty multipliers
+         */
+        float holeSize,holeChance;
         int scoreMultiplier;
 
         @SuppressLint("ClickableViewAccessibility")
+        /**
+         * Initializes engine variables
+         */
         public Engine(Context context) {
             super(context);
             this.setOnTouchListener(new OnTouchListener() {
@@ -261,6 +292,9 @@ public class Game extends AppCompatActivity {
             initialize();
         }
 
+        /**
+         * (Re)Initializes walls, holes and coins
+         */
         private void initialize()
         {
             // clear objects
@@ -403,7 +437,7 @@ public class Game extends AppCompatActivity {
          * @param w Wall we want to check
          * @param s What side we want to check
          * @param second The second side that is to decide
-         * @return is the wall inner
+         * @return True if the wall is inner, false otherwise
          */
         private boolean isWallCovered(Wall w, Side s, Side second)
         {
@@ -500,7 +534,7 @@ public class Game extends AppCompatActivity {
         /**
          * Checks whether the ball intersects with a wall
          * @param w Wall to check
-         * @return Intersects or not
+         * @return True if they intersect, false otherwise
          */
         private boolean intersects(Wall w)
         {
@@ -589,6 +623,7 @@ public class Game extends AppCompatActivity {
             for (int i = 0; i < holes.length; i++) {
                 for (int j = 0; j < holes[i].length; j++) {
                     if (holes[i][j] != null && holes[i][j].collides(ball)) {
+                        // collided with ball, hide the ball and say that game's over
                         ball.setVisibility(View.GONE);
                         gameOver.setMessage("Your score: " + score + "\n" +
                                             "Highscore: " + highscore);
@@ -659,6 +694,10 @@ public class Game extends AppCompatActivity {
         public void onAccuracyChanged(Sensor sensor, int accuracy) {
         }
 
+        /**
+         * Used for updating ball's position
+         * @param canvas
+         */
         @Override
         protected void onDraw(Canvas canvas) {
             // start the game

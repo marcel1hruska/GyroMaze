@@ -4,7 +4,7 @@ import android.content.Context;
 import android.view.View;
 
 /**
- * Collectible coin, increases highscore
+ * Collectible coin, increases highscore.
  */
 class Coin extends View {
     public int diameter;
@@ -19,9 +19,9 @@ class Coin extends View {
     }
 
     /**
-     * Coin-Ball collision check
+     * Coin-Ball collision check, ball must touch the coin
      * @param b Ball to check
-     * @return if collision happened
+     * @return True if collision happened, false otherwise
      */
     public boolean collides(Ball b)
     {

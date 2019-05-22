@@ -4,7 +4,7 @@ import android.content.Context;
 import android.view.View;
 
 /**
- * Wall obstacle
+ * Wall obstacle.
  * Forms Maze
  */
 class Wall extends View {

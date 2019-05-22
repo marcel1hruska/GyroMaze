@@ -8,17 +8,19 @@ import java.util.Stack;
  * Generates random rectangular maze
  */
 public class MazeGenerator {
-
     private Random random;
     private int width;
     private int height;
 
-    //visited cells are marked true
+    /**
+     * Visited cells are marked true
+     */
     private boolean[][] cells;
 
-    //removed walls are marked true
-    public boolean[][] horizontalWalls;
-    public boolean[][] verticalWalls;
+    /**
+     * Removed walls are marked true
+     */
+    public boolean[][] horizontalWalls,verticalWalls;
 
     public MazeGenerator(int w, int h) {
         random = new Random();
@@ -30,7 +32,9 @@ public class MazeGenerator {
     }
 
     /**
-     * Generates random maze
+     * Generates random maze.
+     * Can be called once only!
+     * @param d Difficulty settings
      */
     public void Generate(MainMenu.Difficulty d) {
         Cell current = new Cell(random.nextInt(width), random.nextInt(height));

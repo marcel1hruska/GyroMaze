@@ -2,11 +2,11 @@
     <string name="app_name">GyroMaze</string>
     <string name="game_name">GyroMaze</string>
     <string name="button_start">START</string>
-    <string name="highscore">HIGHSCORE</string>
-    <string name="difficulty_text">DIFFICULTY</string>
-    <string-array name="difficulty">
-        <item>Easy</item>
-        <item>Medium</item>
-        <item>Hard</item>
-    </string-array>
+    <string name="highscore">HIGHSCORE: </string>
+    <string name="main_menu">BACK TO MAIN MENU</string>
+    <string name="help">HELP</string>
+    <string name="quit">QUIT</string>
+    <string name="help_message">Select difficulty and start the game! Each time you get a new randomly generated maze. Collect the coins while avoiding the holes.\n\n
+                                Increasing the difficulty makes the game more challenging as the holes are larger and more frequent. But you get more points from each collected coin.\n\n
+                                Collect all the coins and a new level with the same difficulty settings will be generated. Get as high score as possible! </string>
 </resources>

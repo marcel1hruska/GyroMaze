@@ -6,6 +6,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.ArrayAdapter;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.content.Context;
@@ -18,10 +19,47 @@ public class MainMenu extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main_menu);
 
+        Spinner spinner = findViewById(R.id.difficulty_spinner);
+
+        // Initializing a String Array
+        String[] plants = new String[]{
+                "Easy",
+                "Medium",
+                "Hard"
+        };
+
+        // Initializing an ArrayAdapter
+        ArrayAdapter<String> spinnerArrayAdapter = new ArrayAdapter<String>(
+                this,R.layout.spinner_item,plants
+        );
+        spinnerArrayAdapter.setDropDownViewResource(R.layout.spinner_item);
+        spinner.setAdapter(spinnerArrayAdapter);
+
         fullscreen();
         refreshScore();
     }
 
+    /**
+     * Show help dialog
+     * @param view
+     */
+    public void displayHelp(View view) {
+        Intent intent = new Intent(this, Help.class);
+        startActivity(intent);
+    }
+
+    /**
+     * End application
+     * @param view
+     */
+    public void endGame(View view) {
+        finish();
+    }
+
+    /**
+     * Start maze game
+     * @param view
+     */
     public void startGame(View view) {
         //set difficulty
         Spinner mySpinner = findViewById(R.id.difficulty_spinner);
@@ -63,7 +101,7 @@ public class MainMenu extends AppCompatActivity {
 
         //show score
         TextView scoreField = findViewById(R.id.score);
-        scoreField.setText(Integer.toString(score));
+        scoreField.setText("Highscore: " + Integer.toString(score));
     }
 
     /**

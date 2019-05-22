@@ -4,8 +4,8 @@ import android.content.Context;
 import android.view.View;
 
 /**
- * Moving ball in maze
- * Recomputes its position according to the velocity taken from phone's accelerometer
+ * Moving ball in maze.
+ * Recomputes its position according to the velocity taken from phone's accelerometer.
  */
 class Ball extends View {
     /**
@@ -13,15 +13,15 @@ class Ball extends View {
      */
     public int diameter;
     /**
-     * Previous positions
+     * Previous position
      */
     public float oldX, oldY;
     /**
-     * Current positions
+     * Current position
      */
     public float X = 0, Y = 0;
     /**
-     * Balls velocities
+     * Balls velocity
      */
     public float velX,velY;
 
@@ -31,7 +31,7 @@ class Ball extends View {
     }
 
     /**
-     * Update ball's position and velocities
+     * Update ball's position and velocity
      * @param sensorX X value from accelerometer
      * @param sensorY Y value from accelerometer
      * @param delta Time delta
