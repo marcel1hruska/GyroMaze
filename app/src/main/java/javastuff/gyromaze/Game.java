@@ -1,6 +1,10 @@
 package javastuff.gyromaze;
 
+import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -30,30 +34,64 @@ public class Game extends AppCompatActivity {
     private Engine engine;
     private SensorManager sensorMngr;
     private Display display;
-
+    private AlertDialog pauseMenu;
+    private AlertDialog gameOver;
+    private MainMenu.Difficulty difficulty;
+    private int highscore;
     /** 
      * Activity created
      */
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // make the app fullscreen
-        getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-        
+
         sensorMngr = (SensorManager) getSystemService(SENSOR_SERVICE);
         display = ((WindowManager) getSystemService(WINDOW_SERVICE)).getDefaultDisplay();
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        
+        difficulty = MainMenu.Difficulty.values()[getIntent().getExtras().getInt("difficulty")];
+
         // initialize engine
         engine = new Engine(this);
-        engine.setBackgroundResource(R.drawable.steel);
+        engine.setBackgroundResource(R.drawable.texture);
         setContentView(engine);
+
+        // build pause menu
+        AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(engine.getContext());
+        // set dialog message
+        alertDialogBuilder
+                .setTitle("Paused")
+                .setCancelable(false)
+                .setPositiveButton("Continue",
+                        new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int id) {
+                                dialog.cancel();
+                                engine.unpause();
+                            }
+                        })
+                .setNegativeButton("Back to Menu",
+                        new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int id) {
+                                end();
+                            }
+                        });
+
+        // create alert dialog
+        pauseMenu = alertDialogBuilder.create();
+
+        alertDialogBuilder = new AlertDialog.Builder(engine.getContext());
+        alertDialogBuilder
+                .setTitle("Game Over")
+                .setCancelable(false)
+                .setNegativeButton("Back to Menu",
+                        new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int id) {
+                                end();
+                            }
+                        });
+        gameOver = alertDialogBuilder.create();
+
+        SharedPreferences prefs = getSharedPreferences("score_value_unique_key", Context.MODE_PRIVATE);
+        highscore = prefs.getInt("score", 0);
     }
 
     /**
@@ -63,14 +101,6 @@ public class Game extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // refresh fullscreen
-        getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
     }
 
     /**
@@ -80,8 +110,46 @@ public class Game extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         // stop the simulation
-        engine.stop();
-        engine.Paused = true;
+        engine.pause();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        if (hasFocus)
+            fullscreen();
+    }
+
+    @Override
+    public void onDestroy()
+    {
+        super.onDestroy();
+        pauseMenu.dismiss();
+        gameOver.dismiss();
+    }
+
+    /**
+     * Save highscore and finish activity
+     */
+    public void end()
+    {
+        if (highscore < engine.score)
+        {
+            SharedPreferences.Editor editor = getSharedPreferences("score_value_unique_key", Context.MODE_PRIVATE).edit();
+            editor.putInt("score", engine.score);
+            editor.commit();
+        }
+        finish();
+    }
+
+    private void fullscreen()
+    {
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
     }
 
     class Engine extends FrameLayout implements SensorEventListener {
@@ -91,108 +159,220 @@ public class Game extends AppCompatActivity {
         // game state
         public boolean Paused = false;
         // acceleration sensor
-        private Sensor accel;
+        private final Sensor accel;
         // captured sensors values
         private Vector sensor;
         // screen resolution
         private float screenWidth;
         private float screenHeight;
         // ball in maze
-        private final Ball ball;
+        private Ball ball;
         // random maze generator
         private MazeGenerator gen;
         // existing walls
         private Wall verticalWalls[][];
         private Wall horizontalWalls[][];
+        // game info deduced from current resolution
+        private final int horizontalWallHWidth;
+        private final int verticalWallHeight;
+        private final int wallSize;
+        private final int cellSize;
+        private final float circleDiameter;
+        // collectible coins
+        private Coin coins[][];
+        // holes, game over if hit
+        private Hole holes[][];
         // previous time
         private long lastTime = 0;
+        // current score
+        int score = 0;
+        // number of coins left
+        int coinCount = 0;
+        // difficulty multipliers
+        float holeSize;
+        float holeChance;
+        int scoreMultiplier;
 
+        @SuppressLint("ClickableViewAccessibility")
         public Engine(Context context) {
             super(context);
-
             this.setOnTouchListener(new OnTouchListener() {
                 @Override
                 public boolean onTouch(View v, MotionEvent event) {
-                    Paused = !Paused;
-                    if (Paused) stop();
-                    else start();
+                    if (event.getAction() == MotionEvent.ACTION_DOWN && !Paused) {
+                        pause();
+                    }
                     return true;
                 }
             });
 
-            // initialize final variables
+            // initialize variables
             cellsX = 10;
             cellsY = 8;
             verticalWalls = new Wall[cellsX][cellsY-1];
             horizontalWalls= new Wall[cellsX-1][cellsY];
+            coins = new Coin[cellsX][cellsY];
+            holes = new Hole[cellsX][cellsY];
             accel = sensorMngr.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
             sensor = new Vector(0,0);
 
             DisplayMetrics metrics = new DisplayMetrics();
             getWindowManager().getDefaultDisplay().getRealMetrics(metrics);
 
-            // initialize ball
-            ball = new Ball(getContext(),Math.min(metrics.heightPixels / 25, metrics.widthPixels / 25) / 2);
-            ball.setBackgroundResource(R.drawable.ball);
-            ball.setLayerType(LAYER_TYPE_HARDWARE, null);
-            addView(ball, new ViewGroup.LayoutParams(ball.diameter*2,ball.diameter*2));
-
             BitmapFactory.Options opts = new BitmapFactory.Options();
             opts.inPreferredConfig = Bitmap.Config.RGB_565;
 
             // needed minimum size for cell so the ball can fit in
-            int cellSize = Math.min(metrics.widthPixels / 12, metrics.heightPixels / 12);
+            cellSize = Math.min(metrics.widthPixels / 12, metrics.heightPixels / 12);
 
             //possible width of vertical wall and height of horizontal wall
             int verticalWallWidth = (metrics.widthPixels - cellsY * cellSize) / (cellsY - 1);
             int horizontalWallHeight = (metrics.heightPixels - cellsX * cellSize) / (cellsX - 1);
             // find min from them as unified "thickness" of the wall
-            int wallSize = Math.min(verticalWallWidth, horizontalWallHeight);
+            wallSize = Math.min(verticalWallWidth, horizontalWallHeight);
 
             // recompute height and width
-            int verticalWallHeight = (metrics.heightPixels - (cellsX - 1)*wallSize)/cellsX;
-            int horizontalWallHWidth = (metrics.widthPixels - (cellsY - 1)*wallSize)/cellsY;
+            verticalWallHeight = (metrics.heightPixels - (cellsX - 1)*wallSize)/cellsX;
+            horizontalWallHWidth = (metrics.widthPixels - (cellsY - 1)*wallSize)/cellsY;
+
+            circleDiameter = Math.min(metrics.heightPixels / 25, metrics.widthPixels / 25) / 2;
+
+            // set difficulty
+            switch (difficulty)
+            {
+                case Easy:
+                    holeSize = 1.0f;
+                    holeChance = 0.1f;
+                    scoreMultiplier = 1;
+                    break;
+                case Medium:
+                    holeSize = 1.1f;
+                    holeChance = 0.2f;
+                    scoreMultiplier = 2;
+                    break;
+                case Hard:
+                    holeSize = 1.2f;
+                    holeChance = 0.3f;
+                    scoreMultiplier = 3;
+                    break;
+            }
+
+            //initialize walls, holes and coins
+            initialize();
+        }
+
+        private void initialize()
+        {
+            // clear objects
+            removeAllViews();
+            // intialize holes
+            for (int i = 0; i < holes.length; i++)
+            {
+                for (int j = 0; j < holes[i].length; j++)
+                {
+                    if (Math.random() >= holeChance || (i == 0 && j == 0))
+                    {
+                        holes[i][j] = null;
+                        continue;
+                    }
+
+                    float dispX = (float)Math.random() * cellSize + 1 - cellSize/2;
+                    float dispY = (float)Math.random() * cellSize + 1 - cellSize/2;
+
+                    holes[i][j] = new Hole(getContext(),circleDiameter*holeSize,
+                            j * (horizontalWallHWidth + wallSize) + horizontalWallHWidth/2f + dispX,
+                            i * (verticalWallHeight + wallSize) + verticalWallHeight/2f + dispY);
+                    Hole h = holes[i][j];
+                    h.setBackgroundResource(R.drawable.hole);
+                    h.setLayerType(LAYER_TYPE_HARDWARE, null);
+                    addView(h, new ViewGroup.LayoutParams((int)h.diameter*2, (int)h.diameter*2));
+
+                    h.setTranslationX(h.X - h.diameter);
+                    h.setTranslationY(h.Y - h.diameter);
+                }
+            }
+
+            // initialize coins
+            for (int i = 0; i < coins.length; i++) {
+                for (int j = 0; j < coins[i].length; j++) {
+                    if (Math.random() < 0.5) {
+                        coins[i][j] = null;
+                        continue;
+                    }
+
+                    float dispX = (float) Math.random() * cellSize / 5 + 1 - cellSize / 10;
+                    float dispY = (float) Math.random() * cellSize / 5 + 1 - cellSize / 10;
+
+                    coins[i][j] = new Coin(getContext(),(int)circleDiameter,
+                            j * (horizontalWallHWidth + wallSize) + horizontalWallHWidth / 2f + dispX,
+                            i * (verticalWallHeight + wallSize) + verticalWallHeight / 2f + dispY);
+                    Coin c = coins[i][j];
+                    c.setBackgroundResource(R.drawable.coin);
+                    c.setLayerType(LAYER_TYPE_HARDWARE, null);
+                    addView(c, new ViewGroup.LayoutParams(c.diameter * 2, c.diameter * 2));
+
+                    c.setTranslationX(c.X - c.diameter);
+                    c.setTranslationY(c.Y - c.diameter);
+
+                    coinCount++;
+                }
+            }
 
             // generate maze
             gen = new MazeGenerator(cellsX,cellsY);
-            gen.Generate();
+            gen.Generate(difficulty);
 
             // initialize walls
             for (int i = 0; i < cellsX; i++) {
                 for (int j = 0; j < cellsY; j++) {
                     // create wall according to the generator
-                    if (j < cellsY - 1 && !gen.verticalWalls[i][j]) {
-                        // initialize
-                        verticalWalls[i][j] = new Wall(getContext());
-                        verticalWalls[i][j].setBackgroundResource(R.drawable.wall);
-                        verticalWalls[i][j].setLayerType(LAYER_TYPE_HARDWARE, null);
-                        // addition so that the maze looks smooth
-                        int add = (i > 0 && (verticalWalls[i-1][j] != null || horizontalWalls[i-1][j] != null)) ? 0 : wallSize;
-                        addView(verticalWalls[i][j], new ViewGroup.LayoutParams(wallSize, verticalWallHeight + wallSize + add));
-                        // set attributes
-                        verticalWalls[i][j].x = j * (horizontalWallHWidth + wallSize) + horizontalWallHWidth;
-                        verticalWalls[i][j].y = i * (verticalWallHeight + wallSize) - add;
-                        verticalWalls[i][j].width = wallSize;
-                        verticalWalls[i][j].height = verticalWallHeight  + wallSize + add;
-                        // move the wall to its position
-                        verticalWalls[i][j].setTranslationX(verticalWalls[i][j].x);
-                        verticalWalls[i][j].setTranslationY(verticalWalls[i][j].y);
+                    if (j < cellsY - 1) {
+                        if (!gen.verticalWalls[i][j]){
+                            // addition so that the maze looks smooth
+                            int add = (i > 0 && (verticalWalls[i - 1][j] != null || horizontalWalls[i - 1][j] != null)) ? 0 : wallSize;
+                            // initialize
+                            verticalWalls[i][j] = new Wall(getContext(),
+                                    j * (horizontalWallHWidth + wallSize) + horizontalWallHWidth,
+                                    i * (verticalWallHeight + wallSize) - add,
+                                    wallSize,
+                                    verticalWallHeight + wallSize + add);
+                            verticalWalls[i][j].setBackgroundResource(R.drawable.wall);
+                            verticalWalls[i][j].setLayerType(LAYER_TYPE_HARDWARE, null);
+                            addView(verticalWalls[i][j], new ViewGroup.LayoutParams(wallSize, verticalWallHeight + wallSize + add));
+                            // move the wall to its position
+                            verticalWalls[i][j].setTranslationX(verticalWalls[i][j].x);
+                            verticalWalls[i][j].setTranslationY(verticalWalls[i][j].y);
+                        }
+                        else
+                            verticalWalls[i][j] = null;
                     }
-                    if (i < cellsX - 1 && !gen.horizontalWalls[i][j]) {
-                        horizontalWalls[i][j] = new Wall(getContext());
-                        horizontalWalls[i][j].setBackgroundResource(R.drawable.wall);
-                        horizontalWalls[i][j].setLayerType(LAYER_TYPE_HARDWARE, null);
-                        int add = (j < cellsY - 1 && verticalWalls[i][j] != null) ? 0 : wallSize;
-                        addView(horizontalWalls[i][j], new ViewGroup.LayoutParams(horizontalWallHWidth + add, wallSize));
-                        horizontalWalls[i][j].x = j*(horizontalWallHWidth + wallSize);
-                        horizontalWalls[i][j].y = i * (verticalWallHeight + wallSize) + verticalWallHeight;
-                        horizontalWalls[i][j].width = horizontalWallHWidth + add;
-                        horizontalWalls[i][j].height = wallSize;
-                        horizontalWalls[i][j].setTranslationX(horizontalWalls[i][j].x);
-                        horizontalWalls[i][j].setTranslationY(horizontalWalls[i][j].y);
+                    if (i < cellsX - 1) {
+                        if (!gen.horizontalWalls[i][j]) {
+                            int add = (j < cellsY - 1 && verticalWalls[i][j] != null) ? 0 : wallSize;
+                            horizontalWalls[i][j] = new Wall(getContext(),
+                                    j * (horizontalWallHWidth + wallSize),
+                                    i * (verticalWallHeight + wallSize) + verticalWallHeight,
+                                    horizontalWallHWidth + add,
+                                    wallSize);
+
+                            horizontalWalls[i][j].setBackgroundResource(R.drawable.wall);
+                            horizontalWalls[i][j].setLayerType(LAYER_TYPE_HARDWARE, null);
+                            addView(horizontalWalls[i][j], new ViewGroup.LayoutParams(horizontalWallHWidth + add, wallSize));
+
+                            horizontalWalls[i][j].setTranslationX(horizontalWalls[i][j].x);
+                            horizontalWalls[i][j].setTranslationY(horizontalWalls[i][j].y);
+                        }
+                        else
+                            horizontalWalls[i][j] = null;
                     }
                 }
             }
+
+            // initialize ball
+            ball = new Ball(getContext(),(int)circleDiameter);
+            ball.setBackgroundResource(R.drawable.ball);
+            ball.setLayerType(LAYER_TYPE_HARDWARE, null);
+            addView(ball, new ViewGroup.LayoutParams(ball.diameter*2,ball.diameter*2));
         }
 
         private float clamp(float val, float min, float max) {
@@ -390,6 +570,32 @@ public class Game extends AppCompatActivity {
                     wallCollision(horizontalWalls[i][j]);
                 }
             }
+            // coins
+            for (int i = 0; i < coins.length; i++) {
+                for (int j = 0; j < coins[i].length; j++) {
+                    if (coins[i][j] != null && coins[i][j].getVisibility() != View.GONE && coins[i][j].collides(ball)) {
+                        // coin is spawned, still there and collides with ball, hide it and increase score/decrease coin count
+                        coins[i][j].setVisibility(View.GONE);
+                        score+=scoreMultiplier;
+                        coinCount--;
+                        if (coinCount == 0) {
+                            initialize();
+                            ball.X = ball.Y = 0;
+                        }
+                    }
+                }
+            }
+            // holes
+            for (int i = 0; i < holes.length; i++) {
+                for (int j = 0; j < holes[i].length; j++) {
+                    if (holes[i][j] != null && holes[i][j].collides(ball)) {
+                        ball.setVisibility(View.GONE);
+                        gameOver.setMessage("Your score: " + score + "\n" +
+                                            "Highscore: " + highscore);
+                        gameOver.show();
+                    }
+                }
+            }
             // resolve boundary collisions
             ball.boundaryCollisions(screenWidth, screenHeight);
         }
@@ -397,14 +603,21 @@ public class Game extends AppCompatActivity {
         /**
          * Start the game by registering sensor listener
          */
-        public void start() {
+        public void unpause() {
+            Paused = false;
+            fullscreen();
             sensorMngr.registerListener(this, accel, SensorManager.SENSOR_DELAY_GAME);
         }
 
         /**
          * Stop the game
          */
-        public void stop() {
+        public void pause() {
+            Paused = true;
+            pauseMenu.setMessage("Current score: " + engine.score + "\n" +
+                    "Highscore: " + highscore + "\n" +
+                    "Difficulty: " + ((difficulty == MainMenu.Difficulty.Easy) ? "Easy" : (difficulty == MainMenu.Difficulty.Medium) ? "Medium" : "Hard"));
+            pauseMenu.show();
             sensorMngr.unregisterListener(this);
         }
 
@@ -448,6 +661,10 @@ public class Game extends AppCompatActivity {
 
         @Override
         protected void onDraw(Canvas canvas) {
+            // start the game
+            if (lastTime == 0)
+                engine.unpause();
+
             // update time delta
             long time = System.currentTimeMillis();
             float delta = (time - lastTime) / 1000.f;

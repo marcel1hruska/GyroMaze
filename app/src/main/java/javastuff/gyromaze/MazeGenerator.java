@@ -32,14 +32,36 @@ public class MazeGenerator {
     /**
      * Generates random maze
      */
-    public void Generate() {
+    public void Generate(MainMenu.Difficulty d) {
         Cell current = new Cell(random.nextInt(width), random.nextInt(height));
         cells[current.X][current.Y] = true;
         Stack<Cell> stack = new Stack<>();
         for (int visited = 1; visited < width * height; ++visited) {
             ArrayList<Cell> adj = current.AdjacentCells();
             if (adj.size() > 0) {
-                Cell n = adj.get(random.nextInt(adj.size()));
+                Cell n = null;
+                switch (d){
+
+                    case Easy:
+                        if(random.nextDouble() < 0.8)
+                            n = adj.get(0);
+                        else
+                            n = adj.get(random.nextInt(adj.size()) % 2);
+                        break;
+
+                    case Medium:
+                        if(random.nextDouble() < 0.7)
+                            n = adj.get(0);
+                        else
+                            n = adj.get(random.nextInt(adj.size()));
+                        break;
+
+                    default:
+                        n = adj.get(random.nextInt(adj.size()));
+                        break;
+                }
+
+
                 stack.push(current);
                 removeWall(n, current);
                 current = n;

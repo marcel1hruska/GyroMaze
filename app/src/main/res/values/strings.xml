@@ -1,5 +1,12 @@
 <resources>
     <string name="app_name">GyroMaze</string>
-    <string name="game_name">Random Maze Game</string>
+    <string name="game_name">GyroMaze</string>
     <string name="button_start">START</string>
+    <string name="highscore">HIGHSCORE</string>
+    <string name="difficulty_text">DIFFICULTY</string>
+    <string-array name="difficulty">
+        <item>Easy</item>
+        <item>Medium</item>
+        <item>Hard</item>
+    </string-array>
 </resources>

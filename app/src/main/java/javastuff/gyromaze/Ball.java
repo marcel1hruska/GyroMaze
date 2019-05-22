@@ -19,7 +19,7 @@ class Ball extends View {
     /**
      * Current positions
      */
-    public float X = 50, Y = 50;
+    public float X = 0, Y = 0;
     /**
      * Balls velocities
      */
